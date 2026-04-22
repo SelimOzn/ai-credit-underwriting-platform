@@ -7,6 +7,9 @@ from app.agents import(
     risk_analyst,
     supervisor
 )
+from app.llm.policy_agent import run as policy_agent
+from app.llm.explainability_agent import run as explain_agent
+
 
 def route_by_risk(state: AgentState):
     risk = state.risk_score
@@ -43,14 +46,17 @@ def build_graph():
     graph.add_node("financial_analyst", financial_analyst.run)
     graph.add_node("auto_approve", auto_approve)
     graph.add_node("manual_review", manual_review)
+    graph.add_node("policy_agent", policy_agent)
+    graph.add_node("explainability", explain_agent)
 
     graph.set_entry_point("data_collector")
 
     graph.add_edge("data_collector", "financial_analyst")
     graph.add_edge("financial_analyst", "risk_analyst")
+    graph.add_edge("risk_analyst", "policy_agent")
 
     graph.add_conditional_edges(
-        "risk_analyst",
+        "policy_agent",
         route_by_risk,
         {
             "auto_approve":"auto_approve",
@@ -61,6 +67,7 @@ def build_graph():
 
     graph.add_edge("auto_approve", END)
     graph.add_edge("manual_review", END)
-    graph.add_edge("supervisor", END)
+    graph.add_edge("supervisor", "explainability")
+    graph.add_edge("explainability", END)
 
     return graph.compile()

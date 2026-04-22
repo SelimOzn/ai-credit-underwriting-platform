@@ -8,7 +8,7 @@ application = LoanApplication(
     requested_loan=250000,
     employment_years=0.3,
     existing_debt=1000000,
-    credit_score=300
+    credit_score=700
 )
 
 state = AgentState(application=application)
@@ -23,3 +23,5 @@ print("Reasons:", result["reasons"])
 print("Logs:")
 for log in result["logs"]:
     print("-", log)
+
+print(result["policy_flags"])
