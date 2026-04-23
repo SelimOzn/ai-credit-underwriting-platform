@@ -12,6 +12,12 @@ def calculate_lti(application: LoanApplication) -> float:
         4
     )
 
+def calculate_dti_tool(debt, income):
+    return debt / income if income>0 else 999
+
+def calculate_lti_tool(loan, income):
+    return loan / income if income>0 else 999
+
 def calculate_risk_score(
         credit_score:int,
         dti:float,
