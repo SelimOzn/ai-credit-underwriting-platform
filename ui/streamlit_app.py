@@ -3,11 +3,74 @@ import streamlit as st
 from app.models.application import LoanApplication
 from app.models.state import AgentState
 from app.graph.workflow import build_graph
+from app.services.database import (
+    init_db,
+    insert_application,
+    get_all_applications,
+    get_pending_reviews,
+    resolve_review
+)
+
+init_db()
 
 st.set_page_config(
     page_title="AI Credit Underwriting Platform",
     layout="wide",
 )
+
+
+st.sidebar.title("Navigation")
+page = st.sidebar.radio(
+    "Go to",
+    ["New Application", "History Dashboard", "Human Review Queue"]
+)
+
+if page == "History Dashboard":
+    rows = get_all_applications()
+
+    st.title("Application History")
+
+    st.write("Total Applications:", len(rows))
+
+    approve_count = sum(1 for r in rows if r[6] == "APPROVE")
+    reject_count = sum(1 for r in rows if r[6] == "REJECT")
+
+    st.write("Approved:", approve_count)
+    st.write("Rejected:", reject_count)
+
+    st.dataframe(rows)
+    st.stop()
+
+if page == "Human Review Queue":
+    st.title("Human Review Queue")
+    rows = get_pending_reviews()
+
+    for row in rows:
+        app_id = row[0]
+
+        with st.expander(f"Case #{app_id} - {row[1]}"):
+            st.write("Income: ", row[2])
+            st.write("Requested Loan: ", row[3])
+            st.write("Credit Score: ", row[4])
+            st.write("Risk Score: ", row[5])
+
+            reviewer = st.text_input(f"Reviewer {app_id}", key=f"rev_{app_id}")
+            note = st.text_input(f"Note {app_id}", key=f"note_{app_id}")
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                if st.button("Approve", key=f"a_{app_id}"):
+                    resolve_review(app_id, "APPROVE", reviewer, note)
+                    st.rerun()
+
+            with col2:
+                if st.button("Reject", key=f"r_{app_id}"):
+                    resolve_review(app_id, "REJECT", reviewer, note)
+                    st.rerun()
+    st.stop()
+
+
 
 st.title("AI Credit Underwriting Multi-Agent Platform")
 st.subheader("Loan Application Form")
@@ -21,6 +84,9 @@ with st.form("loan_form"):
     credit_score = st.slider("Credit Score", 300, 850, 710)
 
     submitted = st.form_submit_button("Evaluate Application")
+
+
+
 
 if submitted:
     application = LoanApplication(
@@ -37,7 +103,18 @@ if submitted:
     graph = build_graph()
     result = graph.invoke(state)
 
+
+    insert_application(
+        full_name=full_name,
+        monthly_income=monthly_income,
+        requested_loan=requested_loan,
+        credit_score=credit_score,
+        risk_score=result["risk_score"],
+        decision=result["final_decision"]
+    )
+
     st.divider()
+
 
 
     col1, col2, col3 = st.columns(3)
