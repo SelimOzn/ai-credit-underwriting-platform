@@ -1,5 +1,5 @@
 from app.models.state import AgentState
-from app.models.risk_analyst_output import RiskAnalystOutput
+from app.models.outputs import RiskAnalystOutput
 from app.tools.registry import TOOL_REGISTRY
 from app.tools.executor import execute_tool
 

@@ -1,0 +1,14 @@
+Rule 1:
+Applicants with credit score below 580 must be rejected.
+
+Rule 2:
+Debt-to-income ratio above 0.80 requires manual review.
+
+Rule 3:
+Employment history below 1 year increases risk.
+
+Rule 4:
+Loan-to-income ratio above 8.0 requires supervisor approval.
+
+Rule 5:
+Applicants with score above 720 and low debt burden may be auto approved.
