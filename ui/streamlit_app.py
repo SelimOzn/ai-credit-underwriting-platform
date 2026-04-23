@@ -1,4 +1,6 @@
 import streamlit as st
+from requests_toolbelt.multipart.encoder import total_len
+import pandas as pd
 
 from app.models.application import LoanApplication
 from app.models.state import AgentState
@@ -8,10 +10,13 @@ from app.services.database import (
     insert_application,
     get_all_applications,
     get_pending_reviews,
-    resolve_review
+    resolve_review,
+    init_audit_table,
+    insert_audit
 )
 
 init_db()
+init_audit_table()
 
 st.set_page_config(
     page_title="AI Credit Underwriting Platform",
@@ -22,7 +27,7 @@ st.set_page_config(
 st.sidebar.title("Navigation")
 page = st.sidebar.radio(
     "Go to",
-    ["New Application", "History Dashboard", "Human Review Queue"]
+    ["New Application", "History Dashboard", "Human Review Queue", "Executive Dashboard"]
 )
 
 if page == "History Dashboard":
@@ -62,15 +67,46 @@ if page == "Human Review Queue":
             with col1:
                 if st.button("Approve", key=f"a_{app_id}"):
                     resolve_review(app_id, "APPROVE", reviewer, note)
+                    insert_audit(app_id, "MANUAL_DECISION_APPROVED", reviewer, note)
                     st.rerun()
 
             with col2:
                 if st.button("Reject", key=f"r_{app_id}"):
                     resolve_review(app_id, "REJECT", reviewer, note)
+                    insert_audit(app_id, "MANUAL_DECISION_REJECTED", reviewer, note)
                     st.rerun()
     st.stop()
 
 
+if page == "Executive Dashboard":
+    rows = get_all_applications()
+
+    total = len(rows)
+
+    approve = sum(1 for r in rows if r[6] == "APPROVE")
+    reject = sum(1 for r in rows if r[6] == "REJECT")
+    review = sum(1 for r in rows if r[6] == "MANUAL_REVIEW")
+
+    st.title("Executive Dashboard")
+
+    c1,c2,c3,c4 = st.columns(4)
+
+    c1.metric("Total", total)
+    c2.metric("Approved", approve)
+    c3.metric("Rejected", reject)
+    c4.metric("Manual Review", review)
+
+    print(rows[1])
+    df = pd.DataFrame(rows, columns=[
+        "id", "name", "income", "loan",
+        "credit", "risk", "decision", "created_at",
+        "review_status", "reviewed_by", "review_note"
+    ])
+
+    st.subheader("Risk Score Distribution")
+    st.bar_chart(df["risk"])
+    st.write("Approval Rate:", round(approve / total * 100, 2), "%")
+    st.stop()
 
 st.title("AI Credit Underwriting Multi-Agent Platform")
 st.subheader("Loan Application Form")

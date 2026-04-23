@@ -107,3 +107,44 @@ def resolve_review(app_id, final_decision, reviewer, note):
     conn.commit()
     conn.close()
 
+def init_audit_table():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS audit_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        application_id INTEGER,
+        action TEXT,
+        actor TEXT,
+        note TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
+def insert_audit(application_id, action, actor, note):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+
+    cur.execute("""
+    INSERT INTO audit_logs (
+        application_id,
+        action,
+        actor,
+        note
+        )
+    VALUES (?,?,?,?)
+    """,(
+        application_id,
+        action,
+        actor,
+        note
+    ))
+
+    conn.commit()
+    conn.close()
+
+
