@@ -1,92 +1,65 @@
-import json
-import re
-
 from app.models.state import AgentState
-from app.llm.client import ask_llm
-from app.tools.financial import calculate_dti_tool, calculate_lti_tool
+from app.models.risk_analyst_output import RiskAnalystOutput
+from app.tools.registry import TOOL_REGISTRY
+from app.tools.executor import execute_tool
+
+from langchain_ollama import ChatOllama
+from langchain_core.messages import SystemMessage, HumanMessage
+
+llm = ChatOllama(
+    model="qwen2.5:7b",
+    base_url="http://localhost:11434",
+    temperature=0
+)
 
 def run(state: AgentState) -> AgentState:
     app = state.application
 
-    planner_prompt = f"""
-You are a credit risk agent.
+    tools_list = list(TOOL_REGISTRY.values())
+    llm_with_tools = llm.bind_tools(tools_list)
 
-Application:
-income={app.monthly_income}
-debt={app.existing_debt}
-loan={app.requested_loan}
+    messages = [
+        SystemMessage(content="You are a credit risk agent. Use the tools provided to you to analyze customer status."),
+        HumanMessage(content=f"Income: {app.monthly_income}, Debt: {app.existing_debt}, Loan: {app.requested_loan}")
+    ]
 
-Available tools:
-1. calculate_dti_tool
-2. calculate_lti_tool
+    response = llm_with_tools.invoke(messages)
+    tool_results = {}
 
-Return JSON only:
+    if hasattr(response, "tool_calls") and response.tool_calls:
+        for tc in response.tool_calls:
+            name = tc["name"]
+            args = tc["args"]
 
-{{
- "tools":["calculate_dti_tool", "calculate_lti_tool"],
-}}
-"""
-
-    raw = ask_llm(planner_prompt)
-    match = re.search(r'\{.*\}', raw, re.S)
-
-    if match:
-        data = json.loads(match.group())
-        tools = data.get("tools", [])
-    else:
-        tools = ["calculate_dti_tool", "calculate_lti_tool"]
-
-    results = {}
-
-    if "calculate_dti_tool" in tools:
-        results["dti"] = calculate_dti_tool(
-            app.existing_debt,
-            app.monthly_income,
-        )
-
-    if "calculate_lti_tool" in tools:
-        results["lti"] = calculate_lti_tool(
-            app.requested_loan,
-            app.monthly_income,
-        )
+            result = execute_tool(name, args)
+            tool_results[name] = result
 
     final_prompt = f"""
 You are a senior underwriting analyst.
+
+IMPORTANT CALCULATION RULE:
+The risk_score MUST be a probability float value strictly between 0.00 and 1.00.
+- 0.00 means absolutely no risk.
+- 0.50 means moderate risk.
+- 1.00 means absolute maximum risk.
+Do NOT use integer scales like 1, 2, or 3. Use decimals (e.g., 0.85).
 
 Application:
 credit_score={app.credit_score}
 employment_years={app.employment_years}
 
 Tool results:
-{results}
-
-Return JSON only:
-
-{{
-"risk_score": 0.0,
-"reason": "short explanation"
-}}
+{tool_results}
 """
 
-    raw2 = ask_llm(final_prompt)
-    match2 = re.search(r'\{.*\}', raw2, re.S)
+    structured_llm = llm.with_structured_output(RiskAnalystOutput)
+    final_result = structured_llm.invoke(final_prompt)
 
-    if match2:
-        output = json.loads(match2.group())
+    state.risk_score = final_result.risk_score
+    state.reasons.append(final_result.reason)
 
-        risk = float(output["risk_score"])
-        reason = output["reason"]
-    else:
-        risk = 0.50
-        reason = "Fallback parsing used"
-
-    state.risk_score = max(0, min(risk,1))
-    state.reasons.append(reason)
-    state.logs.append(f"Risk Agent tools used: {tools}")
-    state.logs.append(f"Risk Agent result: {state.risk_score}")
-
-    if "dti" in results:
-        state.debt_to_income_ratio = results["dti"]
+    state.logs.append(f"Tools used: {list(tool_results.keys())}")
+    state.logs.append(f"Risk analyst output: {state.risk_score}")
 
     return state
 

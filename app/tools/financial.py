@@ -1,4 +1,5 @@
 from app.models.application import LoanApplication
+from langchain_core.tools import tool
 
 def calculate_dti(application: LoanApplication) -> float:
     return round(
@@ -12,10 +13,24 @@ def calculate_lti(application: LoanApplication) -> float:
         4
     )
 
-def calculate_dti_tool(debt, income):
-    return debt / income if income>0 else 999
+@tool
+def calculate_dti_tool(debt: float, income: float) -> float:
+    """
+    Calculates the user's debt-to-income ratio (DTI).
+    :param debt:
+    :param income:
+    :return:
+    """
+    return debt / income if income>0 else 999.0
 
-def calculate_lti_tool(loan, income):
+@tool
+def calculate_lti_tool(loan: float, income: float) -> float:
+    """
+    Calculates the user's loan-to-loan ratio (LTI).
+    :param loan:
+    :param income:
+    :return:
+    """
     return loan / income if income>0 else 999
 
 def calculate_risk_score(
