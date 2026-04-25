@@ -1,13 +1,12 @@
 import streamlit as st
-from requests_toolbelt.multipart.encoder import total_len
+import requests
 import pandas as pd
 
+API_URL = "http://localhost:8000/evaluate"
+
 from app.models.application import LoanApplication
-from app.models.state import AgentState
-from app.graph.workflow import build_graph
 from app.services.database import (
     init_db,
-    insert_application,
     get_all_applications,
     get_pending_reviews,
     resolve_review,
@@ -83,6 +82,7 @@ if page == "Executive Dashboard":
 
     total = len(rows)
 
+
     approve = sum(1 for r in rows if r[6] == "APPROVE")
     reject = sum(1 for r in rows if r[6] == "REJECT")
     review = sum(1 for r in rows if r[6] == "MANUAL_REVIEW")
@@ -105,7 +105,10 @@ if page == "Executive Dashboard":
 
     st.subheader("Risk Score Distribution")
     st.bar_chart(df["risk"])
-    st.write("Approval Rate:", round(approve / total * 100, 2), "%")
+    if total > 0:
+        st.write("Approval Rate:", round(approve / total * 100, 2), "%")
+    else:
+        st.write("Approval Rate: 0%")
     st.stop()
 
 st.title("AI Credit Underwriting Multi-Agent Platform")
@@ -121,9 +124,6 @@ with st.form("loan_form"):
 
     submitted = st.form_submit_button("Evaluate Application")
 
-
-
-
 if submitted:
     application = LoanApplication(
         full_name=full_name,
@@ -134,47 +134,45 @@ if submitted:
         credit_score=credit_score,
     )
 
-    state = AgentState(application=application)
+    with st.spinner("AI agents are reviewing the application... This process may take a few seconds."):
+        try:
+            # Pydantic modelini JSON formatına (dict) çeviriyoruz
+            payload = application.model_dump()
 
-    graph = build_graph()
-    result = graph.invoke(state)
+            response = requests.post(API_URL, json=payload)
 
+            if response.status_code == 200:
+                result = response.json()
+                decision = result.get("decision", "UNKNOWN")
 
-    insert_application(
-        full_name=full_name,
-        monthly_income=monthly_income,
-        requested_loan=requested_loan,
-        credit_score=credit_score,
-        risk_score=result["risk_score"],
-        decision=result["final_decision"]
-    )
+                st.markdown("---")
+                st.subheader(f"Application result (ID: {result.get('application_id')})")
 
-    st.divider()
+                # Sonuç ekranı
+                if decision == "APPROVED":
+                    st.success("Loan Application APPROVED")
+                elif decision == "REJECTED":
+                    st.error("Loan Application REJECTED")
+                else:
+                    st.warning("The application has been sent for MANUAL REVIEW.")
 
+                st.divider()
 
+                # API'den gelen detayları (risk skoru vs.) ekrana basıyoruz
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Decision", decision)
+                with col2:
+                    st.metric("Risk Score", result.get("risk_score", "N/A"))
+                with col3:
+                    st.metric("DTI", result.get("debt_to_income_ratio", "N/A"))
 
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.metric("Decision", result["final_decision"])
-
-    with col2:
-        st.metric("Risk Score", result["risk_score"])
-
-    with col3:
-        st.metric("DTI", result["debt_to_income_ratio"])
-
-    st.subheader("Reasons")
-
-    for reason in result["reasons"]:
-        st.write("-", reason)
-
-    st.subheader("Agent Logs")
-
-    for log in result["logs"]:
-        st.code(log)
-
-    st.subheader("Policy / Explainability")
-
-    for item in result["policy_flags"]:
-        st.info(item)
+                with st.expander("View Agents' Decision-Making Process Logs", expanded=False):
+                    for log in result.get("logs", []):
+                        st.info(log)
+            else:
+                st.error(f"API Error: {response.status_code} - {response.text}")
+        except requests.exceptions.ConnectionError:
+            st.error("""The backend service is unreachable! 
+            Please ensure the FastAPI server is running by using 
+            the command `uvicorn app.main:app --reload` in a separate terminal.""")

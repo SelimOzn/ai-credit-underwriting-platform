@@ -72,6 +72,20 @@ def get_all_applications():
     conn.close()
     return rows
 
+def get_application(application_id):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+
+    row = cur.execute("""
+    SELECT * FROM applications
+    WHERE id=?
+    """,(
+        application_id,
+    )).fetchone()
+
+    conn.close()
+    return row
+
 def get_pending_reviews():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()

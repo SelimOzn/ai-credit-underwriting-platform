@@ -15,19 +15,22 @@ def run(state: AgentState) -> AgentState:
     app = state.application
 
     query_generator_prompt = f"""
-    You are a search assistant. Your task is to generate a NATURAL LANGUAGE question for a vector-based document search engine (Semantic Search) using the provided customer data.
+    You are an expert search query generator for a Semantic RAG system.
+    Your task is to write a generalized, natural language search question to retrieve the relevant lending policy rules.
 
-    Customer Data:
+    Applicant Data:
     credit_score={app.credit_score}
     employment_years={app.employment_years}
     DTI={state.debt_to_income_ratio}
 
-    RULES:
-    1. STRICTLY DO NOT use SQL (SELECT, WHERE, etc.) or any programming code.
-    2. Write ONLY a plain, human-like question.
-    3. Example of a correct output: "What are the minimum credit score and employment duration requirements for loan approval?"
+    CRITICAL RULES:
+    1. DO NOT include the exact numbers (e.g., {app.credit_score}, {app.employment_years}) in your generated query. Policy documents contain general thresholds (e.g., "minimum score", "maximum DTI"), not exact applicant numbers.
+    2. Ask a generalized question to find the *rules, limits, minimums, and maximums* governing these specific metrics.
+    3. STRICTLY DO NOT use SQL or code.
 
-    Return ONLY the generated question, with no additional explanations or conversational text.
+    Example of a BAD query (Too specific): "Is a loan approved for a 710 credit score and 0 years of employment?"
+
+    Return ONLY the generated question, with no additional conversational text.
     """
 
     semantic_query = llm.invoke(query_generator_prompt).content.strip()
