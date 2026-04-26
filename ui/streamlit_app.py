@@ -1,8 +1,10 @@
 import streamlit as st
 import requests
 import pandas as pd
+import os
 
-API_URL = "http://localhost:8000/evaluate"
+BASE_API_URL = os.getenv("API_URL", "http://localhost:8000")
+API_URL = f"{BASE_API_URL}/evaluate"
 
 from app.models.application import LoanApplication
 from app.services.database import (
@@ -149,9 +151,9 @@ if submitted:
                 st.subheader(f"Application result (ID: {result.get('application_id')})")
 
                 # Sonuç ekranı
-                if decision == "APPROVED":
+                if decision == "APPROVE":
                     st.success("Loan Application APPROVED")
-                elif decision == "REJECTED":
+                elif decision == "REJECT":
                     st.error("Loan Application REJECTED")
                 else:
                     st.warning("The application has been sent for MANUAL REVIEW.")

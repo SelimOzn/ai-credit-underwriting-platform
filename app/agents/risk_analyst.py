@@ -6,9 +6,13 @@ from app.tools.executor import execute_tool
 from langchain_ollama import ChatOllama
 from langchain_core.messages import SystemMessage, HumanMessage
 
+import os
+
+ollama_base_url = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+
 llm = ChatOllama(
     model="qwen2.5:7b",
-    base_url="http://localhost:11434",
+    base_url=ollama_base_url,
     temperature=0
 )
 

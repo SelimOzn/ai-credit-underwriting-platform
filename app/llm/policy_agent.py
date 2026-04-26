@@ -2,11 +2,13 @@ from app.rag.retreiver import search_policy
 from app.models.state import AgentState
 from app.models.outputs import PolicyDecisionOutput
 from langchain_ollama import ChatOllama
+import os
 
+ollama_base_url = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 
 llm = ChatOllama(
     model="qwen2.5:7b",
-    base_url="http://localhost:11434",
+    base_url=ollama_base_url,
     temperature=0
 )
 
