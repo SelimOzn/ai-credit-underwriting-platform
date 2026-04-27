@@ -13,8 +13,9 @@ from app.services.database import (
     get_pending_reviews,
     resolve_review,
     init_audit_table,
-    insert_audit
+    insert_audit,
 )
+from app.models.decision import ManualDecision
 
 init_db()
 init_audit_table()
@@ -24,6 +25,48 @@ st.set_page_config(
     layout="wide",
 )
 
+def get_pending_reviews_from_api():
+    try:
+        response = requests.get(f"{BASE_API_URL}/pending-reviews")
+        if response.status_code == 200:
+            return response.json()
+        else:
+            st.error(f"Error getting pending reviews: {response.status_code}")
+            return []
+    except Exception as e:
+        st.error(f"Backend connection error: {e}")
+        return []
+
+def resolve_review_via_api(app_id: str, decision: ManualDecision, reviewer: str, note: str):
+    payload = {
+        "app_id": app_id,
+        "decision": decision.value,
+        "reviewer": reviewer,
+        "note": note,
+    }
+    try:
+        response = requests.post(f"{BASE_API_URL}/resolve-review", json=payload)
+        if response.status_code == 200:
+            return True
+        else:
+            st.error(f"Error resolving review: {response.status_code}")
+            return False
+    except Exception as e:
+        st.error(f"Backend connection error: {e}")
+        return False
+
+def get_all_applications_from_api():
+    try:
+        response = requests.get(f"{BASE_API_URL}/applications")
+        if response.status_code == 200:
+            return response.json()
+        else:
+            st.error(f"Error getting applications: {response.status_code}")
+            return []
+    except Exception as e:
+        st.error(f"Backend connection error: {e}")
+        return []
+
 
 st.sidebar.title("Navigation")
 page = st.sidebar.radio(
@@ -32,7 +75,7 @@ page = st.sidebar.radio(
 )
 
 if page == "History Dashboard":
-    rows = get_all_applications()
+    rows = get_all_applications_from_api()
 
     st.title("Application History")
 
@@ -49,7 +92,11 @@ if page == "History Dashboard":
 
 if page == "Human Review Queue":
     st.title("Human Review Queue")
-    rows = get_pending_reviews()
+
+    if st.button("🔄 Verileri Güncelle"):
+        st.rerun()
+
+    rows = get_pending_reviews_from_api()
 
     for row in rows:
         app_id = row[0]
@@ -67,20 +114,22 @@ if page == "Human Review Queue":
 
             with col1:
                 if st.button("Approve", key=f"a_{app_id}"):
-                    resolve_review(app_id, "APPROVE", reviewer, note)
-                    insert_audit(app_id, "MANUAL_DECISION_APPROVED", reviewer, note)
-                    st.rerun()
+                    is_success = resolve_review_via_api(app_id, ManualDecision.APPROVE, reviewer, note)
+                    if is_success:
+                        st.success("Application Approved")
+                        st.rerun()
 
             with col2:
                 if st.button("Reject", key=f"r_{app_id}"):
-                    resolve_review(app_id, "REJECT", reviewer, note)
-                    insert_audit(app_id, "MANUAL_DECISION_REJECTED", reviewer, note)
-                    st.rerun()
+                    is_success = resolve_review_via_api(app_id, ManualDecision.REJECT, reviewer, note)
+                    if is_success:
+                        st.success("Application Rejected")
+                        st.rerun()
     st.stop()
 
 
 if page == "Executive Dashboard":
-    rows = get_all_applications()
+    rows = get_all_applications_from_api()
 
     total = len(rows)
 

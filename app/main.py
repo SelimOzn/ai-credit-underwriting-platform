@@ -1,7 +1,14 @@
 from fastapi import FastAPI, HTTPException
 from app.models.application import LoanApplication
+from app.models.decision import ManualDecision
+from app.models.request import ReviewRequest
 from app.graph.workflow import build_graph
-from app.services.database import get_all_applications, insert_application, get_application
+from app.services.database import (get_all_applications,
+                                   insert_application,
+                                   get_application,
+                                   get_pending_reviews,
+                                   resolve_review,
+                                   insert_audit)
 import uuid
 
 app = FastAPI(title="Agentic Loan Evaluation API", version="1.0.0")
@@ -54,4 +61,34 @@ async def check_status(app_id: str):
     if not data:
         raise HTTPException(status_code=404, detail="Application not found")
     return data
+
+
+@app.get("/pending-reviews")
+async def get_pending_applications():
+    try:
+        rows = get_pending_reviews()
+        return rows
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Pending Reviews Failed: {str(e)}")
+
+
+@app.post("/resolve-review")
+async def api_resolve_review(req: ReviewRequest):
+    try:
+        resolve_review(req.app_id, req.decision.value, req.reviewer, req.note)
+
+        insert_audit(req.app_id, req.decision.value, req.reviewer, req.note)
+
+        return {"status": "success", "app_id": req.app_id, "action_logged": req.decision.value}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Review Failed: {str(e)}")
+
+@app.get("/applications")
+async def api_get_applications():
+    try:
+        apps = get_all_applications()
+        return apps
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Application List Failed: {str(e)}")
 
