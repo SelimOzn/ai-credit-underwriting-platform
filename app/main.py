@@ -32,7 +32,7 @@ async def evaluate_loan(application: LoanApplication):
             "is_approved": False
         }
 
-        result = loan_graph.invoke(initial_state)
+        result = await loan_graph.ainvoke(initial_state)
 
         insert_application(
             full_name=application.full_name,

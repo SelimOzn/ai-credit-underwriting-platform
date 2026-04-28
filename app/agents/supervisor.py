@@ -1,7 +1,7 @@
 from app.models.state import AgentState
 from app.models.decision import Decision
 
-def run(state: AgentState) -> AgentState:
+async def run(state: AgentState) -> AgentState:
     app = state.application
     dti = state.debt_to_income_ratio
     risk = state.risk_score

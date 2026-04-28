@@ -13,7 +13,7 @@ llm = ChatOllama(
 )
 
 
-def run(state: AgentState) -> AgentState:
+async def run(state: AgentState) -> AgentState:
     app = state.application
 
     query_generator_prompt = f"""
@@ -35,7 +35,8 @@ def run(state: AgentState) -> AgentState:
     Return ONLY the generated question, with no additional conversational text.
     """
 
-    semantic_query = llm.invoke(query_generator_prompt).content.strip()
+    semantic_query_response = await llm.ainvoke(query_generator_prompt)
+    semantic_query = semantic_query_response.content.strip()
 
     docs = search_policy(semantic_query)
     context = "\n\n---\n\n".join(docs)
@@ -55,7 +56,7 @@ Based ONLY on the policy rules above, decide the outcome.
 """
 
     structured_llm = llm.with_structured_output(PolicyDecisionOutput)
-    result = structured_llm.invoke(final_prompt)
+    result = await structured_llm.ainvoke(final_prompt)
 
     state.logs.append(f"Generated Semantic Query: {semantic_query}")
     state.logs.append("Policy docs retrieved and evaluated")

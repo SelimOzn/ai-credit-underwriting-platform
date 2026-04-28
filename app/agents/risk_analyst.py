@@ -16,7 +16,7 @@ llm = ChatOllama(
     temperature=0
 )
 
-def run(state: AgentState) -> AgentState:
+async def run(state: AgentState) -> AgentState:
     app = state.application
 
     tools_list = list(TOOL_REGISTRY.values())
@@ -27,7 +27,7 @@ def run(state: AgentState) -> AgentState:
         HumanMessage(content=f"Income: {app.monthly_income}, Debt: {app.existing_debt}, Loan: {app.requested_loan}")
     ]
 
-    response = llm_with_tools.invoke(messages)
+    response = await llm_with_tools.ainvoke(messages)
     tool_results = {}
 
     if hasattr(response, "tool_calls") and response.tool_calls:
@@ -57,7 +57,7 @@ Tool results:
 """
 
     structured_llm = llm.with_structured_output(RiskAnalystOutput)
-    final_result = structured_llm.invoke(final_prompt)
+    final_result = await structured_llm.ainvoke(final_prompt)
 
     state.risk_score = final_result.risk_score
     state.reasons.append(final_result.reason)

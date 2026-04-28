@@ -1,6 +1,6 @@
 from app.models.state import AgentState
 
-def run(state: AgentState) -> AgentState:
+async def run(state: AgentState) -> AgentState:
     explanation = f"""
 Final Decision: {state.final_decision}
 
