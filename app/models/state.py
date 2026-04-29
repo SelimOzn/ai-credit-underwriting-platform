@@ -9,7 +9,7 @@ class AgentState(BaseModel):
     debt_to_income_ratio: Optional[float] = None
     risk_score: Optional[float] = None
     policy_flags: List[str] = []
-
+    external_data: Optional[dict]
     final_decision: Optional[Decision] = None
     reasons: List[str] = []
     logs: List[str] = []

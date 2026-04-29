@@ -1,5 +1,7 @@
+import sqlite3
 from langgraph.graph import StateGraph, END
 from app.models.state import AgentState
+from langgraph.checkpoint.sqlite import SqliteSaver
 from app.models.decision import Decision
 from app.agents import(
     data_collector,
@@ -9,6 +11,11 @@ from app.agents import(
 )
 from app.llm.policy_agent import run as policy_agent
 from app.llm.explainability_agent import run as explain_agent
+import os
+
+os.makedirs("data", exist_ok=True)
+db_path = os.path.join("data", "checkpoints.db")
+conn = sqlite3.connect(db_path, check_same_thread=False)
 
 
 def route_by_risk(state: AgentState):
@@ -31,13 +38,14 @@ def auto_approve(state: AgentState):
     return state
 
 def manual_review(state: AgentState):
-    state.final_decision = Decision.MANUAL_REVIEW
-    state.reasons.append("High risk requires human review")
-    state.logs.append("Manual review triggered")
+    if not state.final_decision or state.final_decision == Decision.MANUAL_REVIEW:
+        state.final_decision = Decision.MANUAL_REVIEW
+        state.reasons.append("High risk requires human review")
+        state.logs.append("Manual review triggered")
     return state
 
 
-def build_graph():
+def build_graph(memory):
     graph = StateGraph(AgentState)
 
     graph.add_node("data_collector", data_collector.run)
@@ -70,4 +78,8 @@ def build_graph():
     graph.add_edge("supervisor", "explainability")
     graph.add_edge("explainability", END)
 
-    return graph.compile()
+
+    return graph.compile(
+        checkpointer=memory,
+        interrupt_before=["manual_review", "supervisor"]
+    )

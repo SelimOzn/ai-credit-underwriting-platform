@@ -9,7 +9,7 @@ def init_db():
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS applications (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id TEXT PRIMARY KEY,
         full_name TEXT,
         monthly_income REAL,
         requested_loan REAL,
@@ -28,6 +28,7 @@ def init_db():
 
 
 def insert_application(
+        app_id,
         full_name,
         monthly_income,
         requested_loan,
@@ -40,6 +41,7 @@ def insert_application(
 
     cur.execute("""
     INSERT INTO applications (
+        id,
         full_name,
         monthly_income,
         requested_loan,
@@ -47,8 +49,9 @@ def insert_application(
         risk_score,
         decision
         )
-    VALUES (?,?,?,?,?,?)
+    VALUES (?,?,?,?,?,?,?)
     """, (
+        app_id,
         full_name,
         monthly_income,
         requested_loan,

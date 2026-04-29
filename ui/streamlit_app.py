@@ -7,18 +7,7 @@ BASE_API_URL = os.getenv("API_URL", "http://localhost:8000")
 API_URL = f"{BASE_API_URL}/evaluate"
 
 from app.models.application import LoanApplication
-from app.services.database import (
-    init_db,
-    get_all_applications,
-    get_pending_reviews,
-    resolve_review,
-    init_audit_table,
-    insert_audit,
-)
-from app.models.decision import ManualDecision
-
-init_db()
-init_audit_table()
+from app.models.decision import Decision
 
 st.set_page_config(
     page_title="AI Credit Underwriting Platform",
@@ -37,19 +26,18 @@ def get_pending_reviews_from_api():
         st.error(f"Backend connection error: {e}")
         return []
 
-def resolve_review_via_api(app_id: str, decision: ManualDecision, reviewer: str, note: str):
+def resolve_review_via_api(app_id, decision: Decision, reviewer: str, note: str):
     payload = {
-        "app_id": app_id,
-        "decision": decision.value,
-        "reviewer": reviewer,
-        "note": note,
+        "application_id": str(app_id),
+        "human_decision": decision.value,
+        "human_feedback": f"Reviewer: {reviewer} | Note: {note}",
     }
     try:
-        response = requests.post(f"{BASE_API_URL}/resolve-review", json=payload)
+        response = requests.post(f"{BASE_API_URL}/resume", json=payload)
         if response.status_code == 200:
             return True
         else:
-            st.error(f"Error resolving review: {response.status_code}")
+            st.error(f"Error resolving review: {response.status_code} - {response.text}")
             return False
     except Exception as e:
         st.error(f"Backend connection error: {e}")
@@ -114,14 +102,14 @@ if page == "Human Review Queue":
 
             with col1:
                 if st.button("Approve", key=f"a_{app_id}"):
-                    is_success = resolve_review_via_api(app_id, ManualDecision.APPROVE, reviewer, note)
+                    is_success = resolve_review_via_api(app_id, Decision.MANUAL_APPROVE, reviewer, note)
                     if is_success:
                         st.success("Application Approved")
                         st.rerun()
 
             with col2:
                 if st.button("Reject", key=f"r_{app_id}"):
-                    is_success = resolve_review_via_api(app_id, ManualDecision.REJECT, reviewer, note)
+                    is_success = resolve_review_via_api(app_id, Decision.MANUAL_REJECT, reviewer, note)
                     if is_success:
                         st.success("Application Rejected")
                         st.rerun()
@@ -194,29 +182,29 @@ if submitted:
 
             if response.status_code == 200:
                 result = response.json()
+                api_status = result.get("status")
                 decision = result.get("decision", "UNKNOWN")
 
                 st.markdown("---")
                 st.subheader(f"Application result (ID: {result.get('application_id')})")
 
                 # Sonuç ekranı
-                if decision == "APPROVE":
-                    st.success("Loan Application APPROVED")
+                if decision == "pending_human_review":
+                    st.success("The AI has completed preliminary checks, but this application requires MANUAL REVIEW. Execution is paused.")
                 elif decision == "REJECT":
-                    st.error("Loan Application REJECTED")
-                else:
-                    st.warning("The application has been sent for MANUAL REVIEW.")
+                    st.error("Loan Application AUTO-REJECTED")
+                elif decision == "APPROVE":
+                    st.warning("Loan Application AUTO-APPROVED.")
 
                 st.divider()
 
-                # API'den gelen detayları (risk skoru vs.) ekrana basıyoruz
                 col1, col2, col3 = st.columns(3)
                 with col1:
                     st.metric("Decision", decision)
                 with col2:
                     st.metric("Risk Score", result.get("risk_score", "N/A"))
                 with col3:
-                    st.metric("DTI", result.get("debt_to_income_ratio", "N/A"))
+                    st.metric("System Status", api_status.replace("_", " ").upper())
 
                 with st.expander("View Agents' Decision-Making Process Logs", expanded=False):
                     for log in result.get("logs", []):

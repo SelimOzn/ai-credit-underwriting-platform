@@ -4,7 +4,5 @@ class Decision(str, Enum):
     APPROVE = 'APPROVE'
     REJECT = 'REJECT'
     MANUAL_REVIEW = 'MANUAL_REVIEW'
-
-class ManualDecision(str, Enum):
-    APPROVE = 'MANUAL_APPROVE'
-    REJECT = 'MANUAL_REJECT'
+    MANUAL_APPROVE = 'MANUAL_APPROVE'
+    MANUAL_REJECT = 'MANUAL_REJECT'

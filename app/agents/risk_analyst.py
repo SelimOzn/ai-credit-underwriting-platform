@@ -21,10 +21,12 @@ async def run(state: AgentState) -> AgentState:
 
     tools_list = list(TOOL_REGISTRY.values())
     llm_with_tools = llm.bind_tools(tools_list)
+    ext_data = state.external_data if state.external_data else {}
 
     messages = [
         SystemMessage(content="You are a credit risk agent. Use the tools provided to you to analyze customer status."),
-        HumanMessage(content=f"Income: {app.monthly_income}, Debt: {app.existing_debt}, Loan: {app.requested_loan}")
+        HumanMessage(content=f"Income: {app.monthly_income}, Debt: {app.existing_debt}, "
+                             f"Loan: {app.requested_loan}, External Data: {ext_data}")
     ]
 
     response = await llm_with_tools.ainvoke(messages)
