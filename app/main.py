@@ -1,5 +1,5 @@
 import os
-
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from app.models.application import LoanApplication
 from app.models.request import ReviewRequest, HumanReviewRequest
@@ -14,6 +14,8 @@ from app.services.database import (get_all_applications,
                                    init_audit_table)
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 import uuid
+
+load_dotenv()
 
 app = FastAPI(title="Agentic Loan Evaluation API", version="1.0.0")
 
@@ -42,7 +44,16 @@ async def evaluate_loan(application: LoanApplication):
             "final_decision": None  # Henüz karar verilmediği için None
         }
 
-        config = {"configurable" : {"thread_id": app_id}}
+        config = {
+            "configurable" : {"thread_id": app_id},
+            "metadata": {
+                "application_id": app_id,
+                "application_name": application.full_name,
+                "requested_loan": application.requested_loan,
+                "credit_score": application.credit_score
+            },
+            "tags": ["loan_evaluation", "v1.0", "qwen2.5"]
+        }
 
         os.makedirs("data", exist_ok=True)
 
@@ -93,7 +104,15 @@ async def evaluate_loan(application: LoanApplication):
 
 @app.post("/resume")
 async def resume_evaluation(request: HumanReviewRequest):
-    config = {"configurable" : {"thread_id": request.application_id}}
+    config = {
+        "configurable" : {"thread_id": request.application_id},
+        "metadata": {
+            "application_id": request.application_id,
+            "human_decision": request.human_decision,
+            "human_feedback": request.human_feedback,
+        },
+        "tags": ["loan_evaluation", "v1.0", "qwen2.5"]
+    }
 
     async with AsyncSqliteSaver.from_conn_string("data/checkpoints.db") as memory:
         loan_graph = build_graph(memory)
