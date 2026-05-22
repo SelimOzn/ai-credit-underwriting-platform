@@ -7,65 +7,121 @@ from langchain_ollama import ChatOllama
 from langchain_core.messages import SystemMessage, HumanMessage
 
 import os
+import joblib
+import numpy as np
+import pandas as pd
+import xgboost as xgb
+import shap
 
-ollama_base_url = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+MODEL_PATH = os.path.join(os.getcwd(), "scoring_models", "xgboost_risk_model.json")
+PREPROCESSOR_PATH = os.path.join(os.getcwd(), "scoring_models", "preprocessor.pkl")
 
-llm = ChatOllama(
-    model="qwen2.5:7b",
-    base_url=ollama_base_url,
-    temperature=0
-)
+if not os.path.exists(PREPROCESSOR_PATH) or not os.path.isfile(MODEL_PATH):
+    raise FileNotFoundError("The trained XGBoost model or preprocessor object could not be found in "
+                            "the scoring_models/ directory.")
+
+
+model = xgb.XGBClassifier()
+model.load_model(MODEL_PATH)
+
+preprocessor = joblib.load(PREPROCESSOR_PATH)
+
+explainer = shap.TreeExplainer(model)
+
 
 async def run(state: AgentState) -> AgentState:
     app = state.application
 
-    tools_list = list(TOOL_REGISTRY.values())
-    llm_with_tools = llm.bind_tools(tools_list)
-    ext_data = state.external_data if state.external_data else {}
+    past_defaults = state.external_data["past_defaults"]
+    cb_person_default_on_file = "Y" if past_defaults>0 else "N"
 
-    messages = [
-        SystemMessage(content="You are a credit risk agent. Use the tools provided to you to analyze customer status."),
-        HumanMessage(content=f"Income: {app.monthly_income}, Debt: {app.existing_debt}, "
-                             f"Loan: {app.requested_loan}, External Data: {ext_data}")
-    ]
+    credit_score = app.credit_score
+    loan_grade = ""
+    if credit_score > 799:
+        loan_grade = "A"
+    elif credit_score > 739:
+        loan_grade = "B"
+    elif credit_score > 669:
+        loan_grade = "C"
+    elif credit_score > 579:
+        loan_grade = "D"
+    elif credit_score > 499:
+        loan_grade = "E"
+    elif credit_score > 399:
+        loan_grade = "F"
+    else:
+        loan_grade = "G"
 
-    response = await llm_with_tools.ainvoke(messages)
-    tool_results = {}
+    loan_percent_income = app.requested_loan / app.monthly_income if app.monthly_income>0 else 0
+    loan_to_emp_length_ratio = app.requested_loan / app.employment_years if app.employment_years>0 else 0
+    int_rate_to_loan_amt_ratio = app.external_data["loan_int_rate"] / app.requested_loan if app.requested_loan>0 else 0
 
-    if hasattr(response, "tool_calls") and response.tool_calls:
-        for tc in response.tool_calls:
-            name = tc["name"]
-            args = tc["args"]
+    age_group = pd.cut(app.age,
+                       bins=[0, 20, 26, 36, 46, 56, 66, float("inf")],
+                       labels=["0-19", "20-25", "26-35", "36-45", "46-55", "56-65", "66-"])[0]
 
-            result = execute_tool(name, args)
-            tool_results[name] = result
+    income_group = pd.cut(app.monthly_income,
+                          bins=[0, 25000, 50000, 75000, 100000, float("inf")],
+                          labels=["low", "low-middle", "middle", "high-middle", "high"])
 
-    final_prompt = f"""
-You are a senior underwriting analyst.
+    loan_amnt_group = pd.cut(app.requested_loan,
+                            bins=[0, 5000, 10000, 15000, float("inf")],
+                            labels=["small", "medium", "large", "very-large"])
 
-IMPORTANT CALCULATION RULE:
-The risk_score MUST be a probability float value strictly between 0.00 and 1.00.
-- 0.00 means absolutely no risk.
-- 0.50 means moderate risk.
-- 1.00 means absolute maximum risk.
-Do NOT use integer scales like 1, 2, or 3. Use decimals (e.g., 0.85).
+    print(app.age)
 
-Application:
-credit_score={app.credit_score}
-employment_years={app.employment_years}
+    raw_data = {
+        "person_age": app.age,
+        "person_income": app.monthly_income,
+        "person_home_ownership": app.home_ownership,
+        "person_emp_length": app.employment_years,
+        "loan_intent": app.loan_intent,
+        "loan_grade": loan_grade,
+        "loan_amnt": app.requested_loan,
+        "loan_int_rate": app.external_data["loan_int_rate"],
+        "loan_percent_income": loan_percent_income,
+        "cb_person_default_on_file": cb_person_default_on_file,
+        "cb_person_cred_hist_length": app.external_data["cb_person_cred_hist_length"],
+        "age_group": age_group,
+        "income_group": income_group,
+        "loan_amount_group": loan_amnt_group,
+        "loan_to_emp_length_ratio": loan_to_emp_length_ratio,
+        "int_rate_to_loan_amt_ratio": int_rate_to_loan_amt_ratio
+    }
 
-Tool results:
-{tool_results}
-"""
+    df = pd.DataFrame(raw_data)
 
-    structured_llm = llm.with_structured_output(RiskAnalystOutput)
-    final_result = await structured_llm.ainvoke(final_prompt)
+    x_processed = preprocessor.transform(df)
+    probabilities = model.predict_proba(x_processed)
 
-    state.risk_score = final_result.risk_score
-    state.reasons.append(final_result.reason)
+    risk_score = float(probabilities[0][1])
 
-    state.logs.append(f"Tools used: {list(tool_results.keys())}")
-    state.logs.append(f"Risk analyst output: {state.risk_score}")
+    shap_values = explainer.shap_values(x_processed)
+
+    if isinstance(shap_values, list):
+        current_shap = shap_values[1][0]
+    elif len(shap_values.shape) == 3:
+        current_shap = shap_values[0, :, 1]
+    elif len(shap_values.shape) == 2 and shap_values.shape[0] == 1:
+        current_shap = shap_values[0]
+    else:
+        current_shap = shap_values
+
+    feature_names = preprocessor.get_feature_names_out()
+    if len(current_shap) == feature_names:
+        impacts = list(zip(feature_names, current_shap))
+    else:
+        impacts = list(zip(feature_names[:len(current_shap)], current_shap))
+
+    impacts.sort(key=lambda x: abs(x[1]), reverse=True)
+
+    top_factors = [f"{name} ({'+' if val>0 else ''}{round(val,4)})" for name, val in impacts[:3]]
+
+    state.risk_score = round(risk_score,4)
+    state.reasons.extend(*impacts)
+
+    state.logs.append(f"XGBoost Risk Model executed. Calculated PD: {state.risk_score}")
+    state.logs.append(f"Primary risk drivers: {', '.join(top_factors)}")
 
     return state
 
