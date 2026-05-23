@@ -6,7 +6,7 @@ import os
 BASE_API_URL = os.getenv("API_URL", "http://localhost:8000")
 API_URL = f"{BASE_API_URL}/evaluate"
 
-from app.models.application import LoanApplication
+from app.models.application import LoanApplication, LoanIntent, Ownership
 from app.models.decision import Decision
 
 st.set_page_config(
@@ -155,11 +155,19 @@ st.subheader("Loan Application Form")
 
 with st.form("loan_form"):
     full_name = st.text_input("Full Name", "Ahmet Yılmaz")
-    monthly_income = st.number_input("Monthly Income", 1.0, 50000.0)
-    requested_loan = st.number_input("Requested Loan", 1.0, 250000.0)
-    employment_years = st.number_input("Employment Years", 0.0, 3.0)
-    existing_debt = st.number_input("Existing Debt", 0.0, 10000.0)
+    col1, col2 = st.columns(2)
+    with col1:
+        monthly_income = st.number_input("Annual Income", 1.0, 50000.0)
+        employment_years = st.number_input("Employment Years", 0.0, 3.0)
+        person_age = st.number_input("Age", min_value=18, max_value=100, value=28, step=1)
+
+    with col2:
+        requested_loan = st.number_input("Requested Loan", 1.0, 250000.0)
+        existing_debt = st.number_input("Existing Debt", 0.0, 10000.0)
+        person_home_ownership = st.selectbox("Home Ownership", [member.value for member in Ownership])
+        loan_intent = st.selectbox("Loan Intent", [member.value for member in LoanIntent])
     credit_score = st.slider("Credit Score", 300, 850, 710)
+
 
     submitted = st.form_submit_button("Evaluate Application")
 
@@ -171,6 +179,9 @@ if submitted:
         employment_years=employment_years,
         existing_debt=existing_debt,
         credit_score=credit_score,
+        home_ownership=person_home_ownership,
+        loan_intent=loan_intent,
+        age=person_age,
     )
 
     with st.spinner("AI agents are reviewing the application... This process may take a few seconds."):

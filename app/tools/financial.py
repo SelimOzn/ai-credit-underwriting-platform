@@ -3,13 +3,13 @@ from langchain_core.tools import tool
 
 def calculate_dti(application: LoanApplication) -> float:
     return round(
-        application.existing_debt / application.monthly_income,
+        application.existing_debt / application.monthly_income if application.monthly_income>0 else 999.0,
         4
     )
 
 def calculate_lti(application: LoanApplication) -> float:
     return round(
-        application.requested_loan / (12 * application.monthly_income),
+        application.requested_loan / (12 * application.monthly_income) if application.monthly_income>0 else 999.0,
         4
     )
 

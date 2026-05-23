@@ -25,8 +25,6 @@ def route_by_risk(state: AgentState):
         return "supervisor"
     elif risk < 0.3:
         return "auto_approve"
-    elif risk < 0.7:
-        return "supervisor"
     else:
         return "manual_review"
 

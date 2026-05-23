@@ -2,7 +2,7 @@ from app.models.state import AgentState
 from app.models.outputs import RiskAnalystOutput
 from app.tools.registry import TOOL_REGISTRY
 from app.tools.executor import execute_tool
-
+from app.tools.financial import calculate_dti,calculate_lti
 from langchain_ollama import ChatOllama
 from langchain_core.messages import SystemMessage, HumanMessage
 
@@ -36,7 +36,7 @@ async def run(state: AgentState) -> AgentState:
     cb_person_default_on_file = "Y" if past_defaults>0 else "N"
 
     credit_score = app.credit_score
-    loan_grade = ""
+
     if credit_score > 799:
         loan_grade = "A"
     elif credit_score > 739:
@@ -52,7 +52,7 @@ async def run(state: AgentState) -> AgentState:
     else:
         loan_grade = "G"
 
-    loan_percent_income = app.requested_loan / app.monthly_income if app.monthly_income>0 else 0
+    loan_percent_income = calculate_lti(app)
     loan_to_emp_length_ratio = app.requested_loan / app.employment_years if app.employment_years>0 else 0
     int_rate_to_loan_amt_ratio = app.external_data["loan_int_rate"] / app.requested_loan if app.requested_loan>0 else 0
 
@@ -71,7 +71,7 @@ async def run(state: AgentState) -> AgentState:
 
     raw_data = {
         "person_age": app.age,
-        "person_income": app.monthly_income,
+        "person_income": app.monthly_income*12,
         "person_home_ownership": app.home_ownership,
         "person_emp_length": app.employment_years,
         "loan_intent": app.loan_intent,
@@ -118,6 +118,7 @@ async def run(state: AgentState) -> AgentState:
 
     state.risk_score = round(risk_score,4)
     state.reasons.extend(*impacts)
+    state["shap_factors"] = impacts
 
     state.logs.append(f"XGBoost Risk Model executed. Calculated PD: {state.risk_score}")
     state.logs.append(f"Primary risk drivers: {', '.join(top_factors)}")
