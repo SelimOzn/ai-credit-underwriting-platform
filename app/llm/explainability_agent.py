@@ -11,29 +11,40 @@ llm = ChatOllama(
 
 
 async def run(state: AgentState) -> AgentState:
+    app = state.application
     shap_factors = []
     if state.external_data and "shap_factors" in state.external_data:
         shap_factors = state.external_data["shap_factors"]
 
     shap_text = ", ".join(shap_factors) if shap_factors else "No SHAP factors available"
-    reason_text = " | ".join(state.reasons) if state.reasons else "None"
+    reasons_text = " | ".join(state.reasons) if state.reasons else "None"
 
     prompt = f"""
 You are a senior credit risk explainer. Your job is to translate mathematical machine learning outputs into a clear, concise report for a human underwriter.
 
-Applicant Data:
-- Final Decision: {state.final_decision}
-- Risk Score (Probability of Default): {state.risk_score}
-- Supervisor Reasons: {reason_text}
+    REAL APPLICANT DATA (RAW VALUES):
+    - Age: {app.age}
+    - Annual Income: {app.monthly_income*12} TL
+    - Employment Length: {app.employment_years} years
+    - Requested Loan: {app.requested_loan} TL
+    - Home Ownership: {app.home_ownership}
+    - Credit Score (KBB): {app.credit_score}
 
-Machine Learning SHAP values (Top Risk Drivers):
-{shap_text}
-*(Note for you: Positive SHAP values mean the feature increased the risk of default.
+    SYSTEM OUTCOMES:
+    - Final Decision: {state.final_decision}
+    - Risk Score (Probability of Default): {state.risk_score}
+    - Supervisor Reasons: {reasons_text}
 
-Task:
-Write a brief, professional paragraph explaining exactly WHY this application received its final decision.
-Explicitly mention the SHAP factors and explain how they impacted the risk score in plain, business-friendly English.
-Do not use complex ML jargon like 'SHAP', just explain the impact.
+    MACHINE LEARNING SHAP VALUES (Top Risk Drivers based on transformed data):
+    {shap_text}
+    *(Note for you: Positive SHAP values mean the feature increased the risk. Negative values mean it lowered the risk.)*
+
+    Task:
+    Write a brief, professional paragraph explaining exactly WHY this application received its final decision. 
+    You MUST connect the SHAP factors to the REAL APPLICANT DATA. 
+    For example, if SHAP says 'person_income' lowered the risk, you should explicitly mention their actual income of {app.monthly_income} TL in your explanation.
+    
+    CRITICAL RULE: Do NOT use complex ML jargon, preprocessor prefixes (like num__ or cat__), or raw SHAP decimal numbers in the final text. Just explain the logical impact using the real applicant values.
 """
     response = await llm.ainvoke(prompt)
     explanation = response.content.strip()

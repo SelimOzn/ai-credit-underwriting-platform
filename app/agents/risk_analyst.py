@@ -5,6 +5,7 @@ from app.tools.executor import execute_tool
 from app.tools.financial import calculate_dti,calculate_lti
 from langchain_ollama import ChatOllama
 from langchain_core.messages import SystemMessage, HumanMessage
+from pathlib import Path
 
 import os
 import joblib
@@ -13,8 +14,10 @@ import pandas as pd
 import xgboost as xgb
 import shap
 
-MODEL_PATH = os.path.join(os.getcwd(), "scoring_models", "xgboost_risk_model.json")
-PREPROCESSOR_PATH = os.path.join(os.getcwd(), "scoring_models", "preprocessor.pkl")
+
+root = Path.cwd()
+MODEL_PATH = Path(root, "scoring_models", "xgboost_risk_model.json")
+PREPROCESSOR_PATH = Path(root, "scoring_models", "preprocessor.pkl")
 
 if not os.path.exists(PREPROCESSOR_PATH) or not os.path.isfile(MODEL_PATH):
     raise FileNotFoundError("The trained XGBoost model or preprocessor object could not be found in "

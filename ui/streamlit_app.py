@@ -157,8 +157,8 @@ with st.form("loan_form"):
     full_name = st.text_input("Full Name", "Ahmet Yılmaz")
     col1, col2 = st.columns(2)
     with col1:
-        monthly_income = st.number_input("Annual Income", 1.0, 50000.0)
-        employment_years = st.number_input("Employment Years", 0.0, 3.0)
+        monthly_income = st.number_input("Monthly Income", 1.0, 150000.0, value=30.0)
+        employment_years = st.number_input("Employment Years", 0, 70)
         person_age = st.number_input("Age", min_value=18, max_value=100, value=28, step=1)
 
     with col2:
@@ -195,6 +195,7 @@ if submitted:
                 result = response.json()
                 api_status = result.get("status")
                 decision = result.get("decision", "UNKNOWN")
+                policy_flag = result.get("policy_flags", [])
 
                 st.markdown("---")
                 st.subheader(f"Application result (ID: {result.get('application_id')})")
@@ -216,6 +217,12 @@ if submitted:
                     st.metric("Risk Score", result.get("risk_score", "N/A"))
                 with col3:
                     st.metric("System Status", api_status.replace("_", " ").upper())
+
+                ai_explanation = next((flag for flag in policy_flag if str(flag).startswith("AI Explanation")), None)
+
+                if ai_explanation:
+                    clean_text = ai_explanation.replace("AI Explanation:\n", "").strip()
+                    st.info(f"F**Underwriter AI Rationale:**\n\n{clean_text}")
 
                 with st.expander("View Agents' Decision-Making Process Logs", expanded=False):
                     for log in result.get("logs", []):

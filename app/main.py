@@ -72,14 +72,15 @@ async def evaluate_loan(application: LoanApplication):
                     requested_loan=application.requested_loan,
                     credit_score=application.credit_score,
                     risk_score=result.get("risk_score") or 0.0,
-                    decision="MANUAL_REVIEW"  # Bu değer kuyrukta görünmesini sağlar
+                    decision="MANUAL_REVIEW",  # Bu değer kuyrukta görünmesini sağlar
                 )
                 return {
                     "status": "pending_human_review",
                     "application_id": app_id,
                     "message": "The system has completed the preliminary assessment; we are awaiting manual human approval.",
                     "risk_score": result.get("risk_score"),
-                    "logs": result.get("logs")
+                    "logs": result.get("logs"),
+                    "policy_flags": result.get("policy_flags")
                 }
             else:
                 insert_application(
@@ -96,7 +97,8 @@ async def evaluate_loan(application: LoanApplication):
                     "application_id": app_id,
                     "logs": result.get("logs"),
                     "decision": result.get("final_decision"),
-                    "risk_score": result.get("risk_score")
+                    "risk_score": result.get("risk_score"),
+                    "policy_flags": result.get("policy_flags")
                 }
 
     except Exception as e:
