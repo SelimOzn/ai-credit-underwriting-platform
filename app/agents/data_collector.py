@@ -37,9 +37,13 @@ async def run(state: AgentState) -> AgentState:
         external_info = await fetch_kbb_and_tramer_data(app.full_name)
 
         subset = data[(data["person_age"] >=app.age-10)&(data["person_age"]<=app.age+10)]
-        cred_hist_len = 0
-        if len(subset)>0:
-            cred_hist_len = subset["cb_person_cred_hist_length"].sample(1).iloc[0]
+
+        if len(subset) == 0:
+            age_diff = (data["person_age"]-app.age).abs()
+            closest_age = age_diff.loc[age_diff.idxmin(), "person_age"]
+            subset = data[data["person_age"] == closest_age]
+
+        cred_hist_len = subset["cb_person_cred_hist_length"].sample(1).iloc[0]
 
         external_info["cb_person_cred_hist_length"] = cred_hist_len
         state.external_data = external_info

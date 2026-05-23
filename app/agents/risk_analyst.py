@@ -68,7 +68,6 @@ async def run(state: AgentState) -> AgentState:
                             bins=[0, 5000, 10000, 15000, float("inf")],
                             labels=["small", "medium", "large", "very-large"])
 
-    print(app.age)
 
     raw_data = {
         "person_age": app.age,
