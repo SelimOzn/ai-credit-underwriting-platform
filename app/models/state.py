@@ -13,3 +13,4 @@ class AgentState(BaseModel):
     final_decision: Optional[Decision] = None
     reasons: List[str] = []
     logs: List[str] = []
+    shap_factors: List = []

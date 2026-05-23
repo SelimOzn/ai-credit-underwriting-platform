@@ -225,6 +225,9 @@ if submitted:
                     st.info(f"F**Underwriter AI Rationale:**\n\n{clean_text}")
 
                 with st.expander("View Agents' Decision-Making Process Logs", expanded=False):
+                    ext_data = result.get("external_data", {})
+                    loan_int_rate = ext_data.get("loan_int_rate", "N/A")
+                    st.info(loan_int_rate)
                     for log in result.get("logs", []):
                         st.info(log)
             else:

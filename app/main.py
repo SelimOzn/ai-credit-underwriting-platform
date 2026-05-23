@@ -80,7 +80,8 @@ async def evaluate_loan(application: LoanApplication):
                     "message": "The system has completed the preliminary assessment; we are awaiting manual human approval.",
                     "risk_score": result.get("risk_score"),
                     "logs": result.get("logs"),
-                    "policy_flags": result.get("policy_flags")
+                    "policy_flags": result.get("policy_flags"),
+                    "external_data": result.get("external_data")
                 }
             else:
                 insert_application(
@@ -98,7 +99,8 @@ async def evaluate_loan(application: LoanApplication):
                     "logs": result.get("logs"),
                     "decision": result.get("final_decision"),
                     "risk_score": result.get("risk_score"),
-                    "policy_flags": result.get("policy_flags")
+                    "policy_flags": result.get("policy_flags"),
+                    "external_data": result.get("external_data")
                 }
 
     except Exception as e:

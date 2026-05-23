@@ -57,17 +57,14 @@ async def run(state: AgentState) -> AgentState:
 
     loan_percent_income = calculate_lti(app)
     loan_to_emp_length_ratio = app.requested_loan / app.employment_years if app.employment_years>0 else 0
-    int_rate_to_loan_amt_ratio = app.external_data["loan_int_rate"] / app.requested_loan if app.requested_loan>0 else 0
+    int_rate_to_loan_amt_ratio = state.external_data["loan_int_rate"] / app.requested_loan if app.requested_loan>0 else 0
 
-    age_group = pd.cut(app.age,
-                       bins=[0, 20, 26, 36, 46, 56, 66, float("inf")],
-                       labels=["0-19", "20-25", "26-35", "36-45", "46-55", "56-65", "66-"])[0]
 
-    income_group = pd.cut(app.monthly_income,
+    income_group = pd.cut([app.monthly_income],
                           bins=[0, 25000, 50000, 75000, 100000, float("inf")],
                           labels=["low", "low-middle", "middle", "high-middle", "high"])
 
-    loan_amnt_group = pd.cut(app.requested_loan,
+    loan_amnt_group = pd.cut([app.requested_loan],
                             bins=[0, 5000, 10000, 15000, float("inf")],
                             labels=["small", "medium", "large", "very-large"])
 
@@ -80,11 +77,10 @@ async def run(state: AgentState) -> AgentState:
         "loan_intent": app.loan_intent,
         "loan_grade": loan_grade,
         "loan_amnt": app.requested_loan,
-        "loan_int_rate": app.external_data["loan_int_rate"],
+        "loan_int_rate": state.external_data["loan_int_rate"],
         "loan_percent_income": loan_percent_income,
         "cb_person_default_on_file": cb_person_default_on_file,
-        "cb_person_cred_hist_length": app.external_data["cb_person_cred_hist_length"],
-        "age_group": age_group,
+        "cb_person_cred_hist_length": state.external_data["cb_person_cred_hist_length"],
         "income_group": income_group,
         "loan_amount_group": loan_amnt_group,
         "loan_to_emp_length_ratio": loan_to_emp_length_ratio,
@@ -94,6 +90,7 @@ async def run(state: AgentState) -> AgentState:
     df = pd.DataFrame(raw_data)
 
     x_processed = preprocessor.transform(df)
+
     probabilities = model.predict_proba(x_processed)
 
     risk_score = float(probabilities[0][1])
@@ -110,18 +107,19 @@ async def run(state: AgentState) -> AgentState:
         current_shap = shap_values
 
     feature_names = preprocessor.get_feature_names_out()
-    if len(current_shap) == feature_names:
+    if len(current_shap) == len(feature_names):
         impacts = list(zip(feature_names, current_shap))
     else:
         impacts = list(zip(feature_names[:len(current_shap)], current_shap))
 
+    impacts = [(name, float(val)) for name, val in impacts]
     impacts.sort(key=lambda x: abs(x[1]), reverse=True)
 
     top_factors = [f"{name} ({'+' if val>0 else ''}{round(val,4)})" for name, val in impacts[:3]]
 
     state.risk_score = round(risk_score,4)
-    state.reasons.extend(*impacts)
-    state["shap_factors"] = impacts
+    state.reasons.extend([f"{name} ({'+' if val>0 else ''}{round(val,4)})" for name, val in impacts])
+    state.shap_factors = impacts
 
     state.logs.append(f"XGBoost Risk Model executed. Calculated PD: {state.risk_score}")
     state.logs.append(f"Primary risk drivers: {', '.join(top_factors)}")

@@ -30,7 +30,7 @@ async def run(state: AgentState) -> AgentState:
     state.logs.append(f"[Data Collector] External data sources (APIs) are being queried for {app.full_name}")
 
     try:
-        root = Path.cwd().parent.parent
+        root = Path.cwd()
         data = pd.read_csv(Path(root, "data", "scoring_data", "credit_risk_dataset.csv"))
         data.dropna(axis=0, how='any', inplace=True)
 
@@ -43,7 +43,7 @@ async def run(state: AgentState) -> AgentState:
             closest_age = age_diff.loc[age_diff.idxmin(), "person_age"]
             subset = data[data["person_age"] == closest_age]
 
-        cred_hist_len = subset["cb_person_cred_hist_length"].sample(1).iloc[0]
+        cred_hist_len = int(subset["cb_person_cred_hist_length"].sample(1).iloc[0])
 
         external_info["cb_person_cred_hist_length"] = cred_hist_len
         state.external_data = external_info
