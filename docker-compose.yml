@@ -25,6 +25,7 @@ services:
       - "8000:8000"
     volumes:
       - "./data:/app/data"
+      - "./scoring_models:/app/scoring_models"
     depends_on:
       - ollama
     environment:

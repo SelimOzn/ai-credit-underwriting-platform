@@ -7,6 +7,8 @@ An advanced, production-ready Credit Underwriting Platform powered by Generative
 *   **Multi-Agent Orchestration:** Utilizes LangGraph to coordinate multiple AI agents (Data Collector, Financial Analyst, Risk Analyst, Policy Agent, Supervisor, and Explainability) to make robust credit decisions.
 *   **Human-in-the-Loop (HITL):** Applications requiring manual intervention are paused and queued. Human agents can review and resolve them via the Streamlit UI, allowing the AI workflow to gracefully resume.
 *   **State Persistence:** Powered by `AsyncSqliteSaver`, ensuring zero data loss and persistent memory for the AI graph across server restarts.
+*   **Hybrid Decision Engine:** Combines predictive Machine Learning (XGBoost) for quantitative risk assessment with Generative AI (LLMs) for qualitative policy evaluation and explainability.
+*   **Explainable AI (XAI):** Integrates SHAP (SHapley Additive exPlanations) to identify and articulate the primary risk drivers for every applicant, ensuring transparent underwriting.
 *   **Full Observability:** Integrated with LangSmith for tracing, debugging, and monitoring LLM token usage and latency.
 *   **Containerized Architecture:** Fully containerized using Docker & Docker Compose, including a dedicated local Ollama service with GPU support.
 *   **Comprehensive Dashboards:** Streamlit frontend includes a Loan Application Form, History Dashboard, Human Review Queue, and an Executive Dashboard for analytics.
@@ -55,6 +57,12 @@ Once the containers are up and running, you can access the following services:
   * *Executive Dashboard: View risk score distributions and approval rates.*
 * **Backend API Documentation:** `http://localhost:8000/docs`
 
+## Updating the Scoring Model
+The backend is mapped to the `./scoring_models` volume. If you train a new XGBoost model, simply replace the `xgboost_risk_model.json` and `preprocessor.pkl` files in that directory and restart the backend container without rebuilding:
+```bash
+docker-compose restart backend
+```
+
 ## Testing
 The project includes a robust testing infrastructure using `pytest` and `unittest.mock` 
 to simulate database operations and LLM inferences without executing real network calls.
@@ -80,6 +88,7 @@ ai-credit-underwriting-platform/
 │   ├── services/             # Database & External Integrations
 │   └── tools/                # Financial Calculation Tools
 ├── data/                     # SQLite Databases (checkpoints.db, application.db)
+├── scoring_models/           # Pre-trained XGBoost Model and Preprocessor
 ├── tests/                    # Pytest Suite
 ├── ui/                       # Streamlit Frontend UI
 ├── .env                      # Environment Variables
