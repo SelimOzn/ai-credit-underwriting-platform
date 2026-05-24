@@ -42,18 +42,26 @@ async def run(state: AgentState) -> AgentState:
     context = "\n\n---\n\n".join(docs)
 
     final_prompt = f"""
-You are a lending policy compliance officer.
+    You are a strict lending policy compliance officer.
 
-Applicant Data:
-credit_score={app.credit_score}
-employment_years={app.employment_years}
-dti_ratio={state.debt_to_income_ratio}
+    Applicant Data:
+    - Credit Score: {app.credit_score}
+    - Employment Years: {app.employment_years}
+    - Debt-to-Income (DTI) Ratio: {state.debt_to_income_ratio}
+    - Requested Loan: {app.requested_loan}
 
-Retrieved Policy Rules:
-{context}
+    Retrieved Policy Rules:
+    {context}
 
-Based ONLY on the policy rules above, decide the outcome.
-"""
+    INSTRUCTIONS:
+    1. Evaluate the applicant data based ONLY on the retrieved policy rules above.
+    2. For your "recommendation", you MUST choose exactly ONE of the following keywords:
+       - APPROVE (If all data complies with the rules for automatic approval)
+       - REJECT (If the data hits a strict rejection rule)
+       - MANUAL_REVIEW (If the rules specify a manual review is needed)
+       - SUPERVISOR (If the rules specify supervisor approval is needed)
+    3. For your "reason", briefly quote the specific rule that led to your decision.
+    """
 
     structured_llm = llm.with_structured_output(PolicyDecisionOutput)
     result = await structured_llm.ainvoke(final_prompt)

@@ -20,6 +20,18 @@ conn = sqlite3.connect(db_path, check_same_thread=False)
 
 def route_by_risk(state: AgentState):
     risk = state.risk_score
+    policy_flags = state.policy_flags
+
+    policy_requires_review = False
+    for flag in policy_flags:
+        flag_upper = flag.upper()
+        if "REJECT" in flag_upper or "REVIEW" in flag_upper or "SUPERVISOR" in flag_upper:
+            policy_requires_review = True
+            break
+
+    if policy_requires_review:
+        state.logs.append("Routing to Manual Review due to Policy Agent constraints.")
+        return "manual_review"
 
     if risk is None:
         return "supervisor"
